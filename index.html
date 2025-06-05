@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Таблицы экономики FW</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f4f4f4;
+      margin: 0;
+      padding: 2rem;
+    }
+
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+
+    h2 {
+      margin-top: 2rem;
+      color: #555;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-bottom: 2rem;
+      background: white;
+    }
+
+    th, td {
+      padding: 8px 12px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+    }
+
+    th {
+      background: #eee;
+    }
+
+    .loading {
+      text-align: center;
+      font-size: 18px;
+      color: #777;
+    }
+
+    .error {
+      color: red;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Экономика FW: данные из Google Sheets</h1>
+  <div id="output" class="loading">Загрузка данных...</div>
+
+  <script>
+    const workerURL = 'https://fw-economy.rayzomov551.workers.dev';
+
+    fetch(workerURL)
+      .then(res => res.json())
+      .then(data => {
+        const container = document.getElementById('output');
+        container.innerHTML = '';
+
+        for (const [sheetName, rows] of Object.entries(data)) {
+          const title = document.createElement('h2');
+          title.textContent = sheetName;
+          container.appendChild(title);
+
+          const table = document.createElement('table');
+          const thead = document.createElement('thead');
+          const tbody = document.createElement('tbody');
+
+          // Заголовки
+          if (rows.length > 0) {
+            const headerRow = document.createElement('tr');
+            rows[0].forEach(cell => {
+              const th = document.createElement('th');
+              th.textContent = cell;
+              headerRow.appendChild(th);
+            });
+            thead.appendChild(headerRow);
+          }
+
+          // Данные
+          rows.slice(1).forEach(row => {
+            const tr = document.createElement('tr');
+            row.forEach(cell => {
+              const td = document.createElement('td');
+              td.textContent = cell;
+              tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+          });
+
+          table.appendChild(thead);
+          table.appendChild(tbody);
+          container.appendChild(table);
+        }
+      })
+      .catch(err => {
+        const container = document.getElementById('output');
+        container.className = 'error';
+        container.textContent = 'Ошибка загрузки данных: ' + err.message;
+      });
+  </script>
+
+</body>
+</html>
