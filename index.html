@@ -4,72 +4,113 @@
   <meta charset="UTF-8">
   <title>Google Sheets Viewer</title>
   <style>
-    body { font-family: sans-serif; background: #f9f9f9; margin: 0; padding: 1em; }
-    .sheet { margin-bottom: 3em; }
-    table { border-collapse: collapse; box-shadow: 0 0 4px #ccc; }
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f5f5f5;
+    }
+    #tabs {
+      display: flex;
+      gap: 0.5rem;
+      background: #ddd;
+      padding: 0.5rem;
+      overflow-x: auto;
+    }
+    .tab {
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      background: white;
+      border-radius: 4px;
+    }
+    .tab.active {
+      background: #4285F4;
+      color: white;
+    }
+    #table-container {
+      overflow: auto;
+      padding: 1rem;
+    }
+    table {
+      border-collapse: collapse;
+      background: white;
+    }
     td, th {
       border: 1px solid #ccc;
       padding: 4px 8px;
-      position: relative;
-      white-space: pre-wrap;
-      max-width: 300px;
+      max-width: 200px;
     }
-    td[title]::after {
-      content: '📌';
-      position: absolute;
-      top: 2px;
-      right: 4px;
-      font-size: 0.8em;
+    td[data-note]::after {
+      content: "\26A0";
+      color: #f39c12;
+      margin-left: 4px;
     }
   </style>
 </head>
 <body>
-  <div id="content">Загрузка таблиц...</div>
+  <div id="tabs"></div>
+  <div id="table-container"></div>
+
   <script>
-    async function fetchSheets() {
-      const res = await fetch('https://fw-economy.rayzomov551.workers.dev');
-      const sheets = await res.json();
+    const API_URL = 'https://fw-economy.rayzomov551.workers.dev';
+    let currentSheet = null;
+    let cachedData = {};
 
-      const container = document.getElementById('content');
-      container.innerHTML = '';
+    async function loadData() {
+      try {
+        const res = await fetch(API_URL);
+        const json = await res.json();
+        if (!json) return;
 
-      sheets.forEach(sheet => {
-        const div = document.createElement('div');
-        div.className = 'sheet';
-
-        const h2 = document.createElement('h2');
-        h2.textContent = sheet.title;
-        div.appendChild(h2);
-
-        const table = document.createElement('table');
-        sheet.data.forEach(row => {
-          const tr = document.createElement('tr');
-          (row?.values || []).forEach(cell => {
-            const td = document.createElement('td');
-            td.textContent = cell.formattedValue ?? '';
-
-            if (cell.note) {
-              td.title = cell.note;
-              td.style.background = '#ffffcc';
+        // If sheet names changed, update tabs
+        const sheets = Object.keys(json);
+        const tabs = document.getElementById('tabs');
+        if (tabs.childElementCount !== sheets.length) {
+          tabs.innerHTML = '';
+          for (const sheet of sheets) {
+            const btn = document.createElement('div');
+            btn.className = 'tab';
+            btn.textContent = sheet;
+            btn.onclick = () => {
+              currentSheet = sheet;
+              renderTable(json[sheet]);
+              document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+              btn.classList.add('active');
             }
-
-            if (cell.effectiveFormat?.backgroundColorStyle?.rgbColor) {
-              const c = cell.effectiveFormat.backgroundColorStyle.rgbColor;
-              td.style.backgroundColor = `rgba(${(c.red||0)*255}, ${(c.green||0)*255}, ${(c.blue||0)*255}, ${c.alpha ?? 1})`;
-            }
-
-            tr.appendChild(td);
-          });
-          table.appendChild(tr);
-        });
-
-        div.appendChild(table);
-        container.appendChild(div);
-      });
+            tabs.appendChild(btn);
+          }
+          if (!currentSheet) {
+            currentSheet = sheets[0];
+            tabs.firstChild.click();
+          }
+        }
+        cachedData = json;
+        if (currentSheet) renderTable(cachedData[currentSheet]);
+      } catch (err) {
+        console.error('Ошибка загрузки:', err);
+      }
     }
 
-    fetchSheets();
-    setInterval(fetchSheets, 10000);
+    function renderTable(data) {
+      const container = document.getElementById('table-container');
+      const table = document.createElement('table');
+      for (let i = 0; i < data.length; i++) {
+        const row = document.createElement('tr');
+        for (let j = 0; j < data[i].length; j++) {
+          const cell = document.createElement(i === 0 ? 'th' : 'td');
+          const content = data[i][j] || '';
+          cell.textContent = content;
+          // примечание и стили можно будет встроить позже
+          row.appendChild(cell);
+        }
+        table.appendChild(row);
+      }
+      container.innerHTML = '';
+      container.appendChild(table);
+    }
+
+    loadData();
+    setInterval(loadData, 30000); // каждые 30 секунд
   </script>
 </body>
 </html>
