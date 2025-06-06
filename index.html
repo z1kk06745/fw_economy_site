@@ -1,178 +1,75 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Google Sheets Preview</title>
-<style>
-  body {
-    font-family: Arial, sans-serif;
-    padding: 10px;
-    background: #f9f9f9;
-  }
-  .sheet-container {
-    margin-bottom: 40px;
-    border: 1px solid #ccc;
-    background: white;
-    box-shadow: 0 0 5px #ccc;
-  }
-  .sheet-title {
-    background: #0078d7;
-    color: white;
-    padding: 8px 12px;
-    font-weight: bold;
-    font-size: 1.2em;
-    user-select: none;
-  }
-  table {
-    border-collapse: collapse;
-    width: 100%;
-    table-layout: fixed;
-    font-size: 14px;
-  }
-  th, td {
-    border: 1px solid #ccc;
-    padding: 4px 6px;
-    overflow-wrap: break-word;
-    white-space: pre-wrap;
-    vertical-align: middle;
-  }
-  td {
-    position: relative;
-  }
-  /* Примечания */
-  td[data-note]:hover::after {
-    content: attr(data-note);
-    position: absolute;
-    left: 100%;
-    top: 0;
-    background: #ffffe0;
-    color: #333;
-    border: 1px solid #ccc;
-    padding: 6px 8px;
-    white-space: normal;
-    max-width: 250px;
-    box-shadow: 2px 2px 6px rgba(0,0,0,0.15);
-    z-index: 10;
-  }
-</style>
+  <meta charset="UTF-8">
+  <title>Google Sheets Viewer</title>
+  <style>
+    body { font-family: sans-serif; background: #f9f9f9; margin: 0; padding: 1em; }
+    .sheet { margin-bottom: 3em; }
+    table { border-collapse: collapse; box-shadow: 0 0 4px #ccc; }
+    td, th {
+      border: 1px solid #ccc;
+      padding: 4px 8px;
+      position: relative;
+      white-space: pre-wrap;
+      max-width: 300px;
+    }
+    td[title]::after {
+      content: '📌';
+      position: absolute;
+      top: 2px;
+      right: 4px;
+      font-size: 0.8em;
+    }
+  </style>
 </head>
 <body>
-
-<div id="sheets-root">Загрузка таблиц...</div>
-
-<script>
-  const workerUrl = 'https://fw-economy.rayzomov551.workers.dev'; // URL воркера
-  
-  async function fetchSheetsData() {
-    try {
-      const res = await fetch(workerUrl);
-      if (!res.ok) throw new Error(`Ошибка загрузки: ${res.status}`);
+  <div id="content">Загрузка таблиц...</div>
+  <script>
+    async function fetchSheets() {
+      const res = await fetch('https://fw-economy.rayzomov551.workers.dev');
       const sheets = await res.json();
-      return sheets;
-    } catch(e) {
-      console.error(e);
-      return null;
-    }
-  }
 
-  // Пример функции стилизации ячеек (расширяй при необходимости)
-  function applyCellStyles(td, style) {
-    if (!style) return;
-    if (style.backgroundColor) td.style.backgroundColor = style.backgroundColor;
-    if (style.textFormat) {
-      const tf = style.textFormat;
-      if (tf.bold) td.style.fontWeight = 'bold';
-      if (tf.italic) td.style.fontStyle = 'italic';
-      if (tf.foregroundColor) {
-        const c = tf.foregroundColor;
-        // Преобразуем объект {red, green, blue} в CSS rgb()
-        const r = Math.round((c.red || 0)*255);
-        const g = Math.round((c.green || 0)*255);
-        const b = Math.round((c.blue || 0)*255);
-        td.style.color = `rgb(${r},${g},${b})`;
-      }
-      if (tf.fontSize) td.style.fontSize = tf.fontSize + 'px';
-    }
-    if (style.horizontalAlignment) td.style.textAlign = style.horizontalAlignment;
-    if (style.verticalAlignment) td.style.verticalAlign = style.verticalAlignment;
-    if (style.wrapStrategy === 'WRAP') td.style.whiteSpace = 'pre-wrap';
-  }
+      const container = document.getElementById('content');
+      container.innerHTML = '';
 
-  // Рендеринг таблиц из данных JSON воркера
-  async function renderSheets() {
-    const root = document.getElementById('sheets-root');
-    root.innerHTML = 'Загрузка таблиц...';
+      sheets.forEach(sheet => {
+        const div = document.createElement('div');
+        div.className = 'sheet';
 
-    const sheetsData = await fetchSheetsData();
-    if (!sheetsData) {
-      root.innerHTML = 'Ошибка загрузки данных.';
-      return;
+        const h2 = document.createElement('h2');
+        h2.textContent = sheet.title;
+        div.appendChild(h2);
+
+        const table = document.createElement('table');
+        sheet.data.forEach(row => {
+          const tr = document.createElement('tr');
+          (row?.values || []).forEach(cell => {
+            const td = document.createElement('td');
+            td.textContent = cell.formattedValue ?? '';
+
+            if (cell.note) {
+              td.title = cell.note;
+              td.style.background = '#ffffcc';
+            }
+
+            if (cell.effectiveFormat?.backgroundColorStyle?.rgbColor) {
+              const c = cell.effectiveFormat.backgroundColorStyle.rgbColor;
+              td.style.backgroundColor = `rgba(${(c.red||0)*255}, ${(c.green||0)*255}, ${(c.blue||0)*255}, ${c.alpha ?? 1})`;
+            }
+
+            tr.appendChild(td);
+          });
+          table.appendChild(tr);
+        });
+
+        div.appendChild(table);
+        container.appendChild(div);
+      });
     }
 
-    root.innerHTML = '';
-    
-    // Каждая вкладка - отдельная таблица
-    for (const [sheetName, sheetInfo] of Object.entries(sheetsData)) {
-      const container = document.createElement('div');
-      container.className = 'sheet-container';
-
-      const title = document.createElement('div');
-      title.className = 'sheet-title';
-      title.textContent = sheetName;
-      container.appendChild(title);
-
-      const table = document.createElement('table');
-
-      const rows = sheetInfo.values || [];
-      const notes = sheetInfo.notes || {};
-      const styles = sheetInfo.styles || {};
-
-      // Определяем ширину колонок по максимальной длине содержимого
-      const colWidths = [];
-      for(let r = 0; r < rows.length; r++) {
-        const row = rows[r];
-        for(let c = 0; c < row.length; c++) {
-          const len = row[c] ? row[c].toString().length : 0;
-          colWidths[c] = Math.max(colWidths[c] || 0, len);
-        }
-      }
-
-      for (let r = 0; r < rows.length; r++) {
-        const tr = document.createElement('tr');
-        const row = rows[r];
-
-        for (let c = 0; c < (row ? row.length : 0); c++) {
-          const td = document.createElement(r === 0 ? 'th' : 'td');
-          td.textContent = row[c] || '';
-
-          // Применяем стили из воркера (если есть)
-          if (styles[r] && styles[r][c]) {
-            applyCellStyles(td, styles[r][c]);
-          }
-
-          // Примечания (notes)
-          if (notes[r] && notes[r][c]) {
-            td.setAttribute('data-note', notes[r][c]);
-          }
-
-          // Устанавливаем минимальную ширину ячейки по содержимому
-          td.style.minWidth = (colWidths[c] * 8 + 12) + 'px'; // примерный расчет
-
-          tr.appendChild(td);
-        }
-        table.appendChild(tr);
-      }
-
-      container.appendChild(table);
-      root.appendChild(container);
-    }
-  }
-
-  // Начальное отображение и автообновление раз в 10 секунд
-  renderSheets();
-  setInterval(renderSheets, 10000);
-</script>
-
+    fetchSheets();
+    setInterval(fetchSheets, 10000);
+  </script>
 </body>
 </html>
